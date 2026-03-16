@@ -1,6 +1,25 @@
-import { useState, useRef, useEffect } from "react";
-import type { ChatMessage } from "../types";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Markdown from "react-markdown";
+import type { ChatMessage, ToolSource } from "../types";
 import "./ChatTab.css";
+
+function SourceBlock({ source }: { source: ToolSource }) {
+  const [expanded, setExpanded] = useState(true);
+  const toggle = useCallback(() => setExpanded((p) => !p), []);
+
+  return (
+    <div className="source-block">
+      <button className="source-header" onClick={toggle}>
+        <span className="source-chevron">{expanded ? "▼" : "▶"}</span>
+        <span className="source-name">{source.toolName}</span>
+        <span className="source-label">raw output</span>
+      </button>
+      {expanded && (
+        <pre className="source-console">{source.consoleOutput}</pre>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   messages: ChatMessage[];
@@ -42,7 +61,17 @@ export function ChatTab({ messages, thinking, sessionId, onSend, onNewChat }: Pr
         {messages.map((msg) => (
           <div key={msg.id} className={`chat-bubble ${msg.role}`}>
             <div className="chat-role">{msg.role === "user" ? "You" : "Agent"}</div>
-            <div className="chat-content">{msg.content}</div>
+            <div className="chat-content">
+              {msg.role === "assistant" ? <Markdown>{msg.content}</Markdown> : msg.content}
+            </div>
+            {msg.sources && msg.sources.length > 0 && (
+              <div className="chat-sources">
+                <div className="chat-sources-divider" />
+                {msg.sources.map((src, i) => (
+                  <SourceBlock key={i} source={src} />
+                ))}
+              </div>
+            )}
             <div className="chat-time">
               {new Date(msg.timestamp).toLocaleTimeString()}
             </div>

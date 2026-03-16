@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1 className="header-title">Dashboard</h1>
+        <h1 className="header-title">Kafka Ops Assistant</h1>
         <span className={`status-badge ${connected ? "connected" : "disconnected"}`}>
           {connected ? "Connected" : "Disconnected"}
         </span>

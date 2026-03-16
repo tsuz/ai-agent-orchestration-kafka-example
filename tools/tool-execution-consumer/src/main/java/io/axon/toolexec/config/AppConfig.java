@@ -21,20 +21,14 @@ public final class AppConfig {
             env("KAFKA_OUTPUT_TOPIC", "tool-use-result");
 
     // ── Tool service endpoints ──────────────────────────────────────────────
-    public static final String WEB_SEARCH_URL =
-            env("WEB_SEARCH_URL", "http://localhost:8082/api/tools/web-search");
+    public static final String RUNBOOKS_URL =
+            env("RUNBOOKS_URL", "http://localhost:8082/api/tools/search-runbooks");
 
-    public static final String CONTACTS_URL =
-            env("CONTACTS_URL", "http://localhost:8082/api/tools/contacts");
+    public static final String KAFKA_CONFIG_URL =
+            env("KAFKA_CONFIG_URL", "http://localhost:8082/api/tools/kafka-config");
 
-    public static final String CALENDAR_URL =
-            env("CALENDAR_URL", "http://localhost:8082/api/tools/calendar");
-
-    public static final String EMAIL_URL =
-            env("EMAIL_URL", "http://localhost:8082/api/tools/email");
-
-    public static final String TASKS_URL =
-            env("TASKS_URL", "http://localhost:8082/api/tools/tasks");
+    public static final String CLUSTER_HEALTH_URL =
+            env("CLUSTER_HEALTH_URL", "http://localhost:8082/api/tools/cluster-health");
 
     // ── Feature flags ────────────────────────────────────────────────────────
     public static final boolean MOCK_MODE =

@@ -1,120 +1,114 @@
 [
   {
-    "name": "web_search",
-    "description": "Search the web for current information on a topic.",
-    "prompt_context": "You are a research assistant. When the user asks a question that requires up-to-date information, use the web_search tool to find relevant results. Summarize the findings concisely and cite your sources. For weather-related queries, include temperature, conditions, and forecasts.",
-    "category": "research",
+    "name": "search_runbooks",
+    "description": "Search the Kafka ops knowledge base for runbooks, playbooks, and operational procedures. Use this when the user asks how to perform an operation and you need more specific context than what was already provided.",
+    "prompt_context": "When the user asks about Kafka operational procedures, troubleshooting steps, or configuration guidance, use search_runbooks to find the most relevant documentation. Return results from runbooks, playbooks, incident reports, and configuration references. Always cite the source document.",
+    "category": "knowledge-base",
     "input_schema": {
       "type": "object",
       "properties": {
         "query": {
           "type": "string",
-          "description": "The search query"
+          "description": "Natural language search query describing what the user needs"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["runbook", "config", "incident", "architecture", "all"],
+          "description": "Filter results by document category. Use 'all' if unsure."
         }
       },
       "required": ["query"]
     }
   },
   {
-    "name": "lookup_contacts",
-    "description": "Look up contact information for a person by name or email.",
-    "prompt_context": "You are a contacts lookup assistant. When the user asks about a person's contact information, use the lookup_contacts tool to find their details. Present the results clearly including name, email, and phone number if available.",
-    "category": "contacts",
+    "name": "lookup_kafka_config",
+    "description": "Look up a specific Kafka configuration key and return its description, default value, and recommended value for our environment. Covers broker, topic, producer, consumer, and Kafka Streams configs.",
+    "prompt_context": "When the user asks about a specific Kafka configuration property (e.g. retention.ms, min.insync.replicas, max.poll.records), use lookup_kafka_config to return its official description, default value, valid values, and the recommended setting for our environment. Always explain the impact of changing it.",
+    "category": "config-reference",
     "input_schema": {
       "type": "object",
       "properties": {
-        "name": {
+        "config_key": {
           "type": "string",
-          "description": "The name of the person to look up"
+          "description": "The Kafka configuration key (e.g. 'retention.ms', 'min.insync.replicas')"
         },
-        "email": {
+        "scope": {
           "type": "string",
-          "description": "The email of the person to look up"
+          "enum": ["broker", "topic", "producer", "consumer", "streams"],
+          "description": "The configuration scope"
         }
       },
+      "required": ["config_key"]
+    }
+  },
+  {
+    "name": "list_consumer_groups",
+    "description": "List all consumer groups in the Kafka cluster. Returns group IDs and their current state (Stable, Rebalancing, Empty, Dead).",
+    "prompt_context": "Use list_consumer_groups when the user asks to see all consumer groups, wants to know what groups exist, or needs to find a specific group name.",
+    "category": "cluster-ops",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
       "required": []
     }
   },
   {
-    "name": "schedule_meeting",
-    "description": "Schedule a meeting with participants at a given time.",
-    "prompt_context": "You are a helpful assistant that schedules meetings. When the user asks to set up a meeting, extract the participants, preferred time, and duration. Use the schedule_meeting tool to book it. Always confirm the details before scheduling.",
-    "category": "scheduling",
+    "name": "describe_consumer_group",
+    "description": "Describe a specific consumer group. Returns state, members, assigned partitions, current offsets, log end offsets, and lag per partition.",
+    "prompt_context": "Use describe_consumer_group when the user asks about a specific consumer group's status, its members, which partitions are assigned, or its overall health. This also shows per-partition lag.",
+    "category": "cluster-ops",
     "input_schema": {
       "type": "object",
       "properties": {
-        "title": {
+        "group_id": {
           "type": "string",
-          "description": "Meeting title"
-        },
-        "participants": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of participant emails"
-        },
-        "start_time": {
-          "type": "string",
-          "description": "ISO 8601 start time"
-        },
-        "duration_minutes": {
-          "type": "integer",
-          "description": "Duration in minutes"
+          "description": "The consumer group ID to describe"
         }
       },
-      "required": ["title", "participants", "start_time", "duration_minutes"]
+      "required": ["group_id"]
     }
   },
   {
-    "name": "send_email",
-    "description": "Send an email to a recipient.",
-    "prompt_context": "You are an email drafting assistant. When the user asks to send an email, help them compose a clear and professional message. Extract the recipient, subject, and body. Use the send_email tool to deliver it. Ask for confirmation before sending.",
-    "category": "email",
+    "name": "list_topics",
+    "description": "List all topics in the Kafka cluster. Returns topic names, partition counts, and replication factors.",
+    "prompt_context": "Use list_topics when the user asks to see all topics, wants to know what topics exist, or needs to find a specific topic.",
+    "category": "cluster-ops",
     "input_schema": {
       "type": "object",
-      "properties": {
-        "to": {
-          "type": "string",
-          "description": "Recipient email address"
-        },
-        "subject": {
-          "type": "string",
-          "description": "Email subject line"
-        },
-        "body": {
-          "type": "string",
-          "description": "Email body content"
-        }
-      },
-      "required": ["to", "subject", "body"]
+      "properties": {},
+      "required": []
     }
   },
   {
-    "name": "create_task",
-    "description": "Create a task or to-do item.",
-    "prompt_context": "You are a task management assistant. When the user wants to create a task or to-do item, extract the title, description, due date, and priority. Use the create_task tool. Default priority is medium if not specified.",
-    "category": "tasks",
+    "name": "get_consumer_lag",
+    "description": "Get the current consumer lag for a specific consumer group. Returns per-partition lag (difference between log end offset and committed offset) and total lag across all partitions.",
+    "prompt_context": "Use get_consumer_lag when the user asks specifically about consumer lag, backlog, or how far behind a consumer group is. This provides a focused view of lag numbers.",
+    "category": "cluster-ops",
     "input_schema": {
       "type": "object",
       "properties": {
-        "title": {
+        "group_id": {
           "type": "string",
-          "description": "Task title"
-        },
-        "description": {
-          "type": "string",
-          "description": "Task description"
-        },
-        "due_date": {
-          "type": "string",
-          "description": "Due date in ISO 8601 format"
-        },
-        "priority": {
-          "type": "string",
-          "enum": ["low", "medium", "high"],
-          "description": "Task priority"
+          "description": "The consumer group ID to check lag for"
         }
       },
-      "required": ["title"]
+      "required": ["group_id"]
+    }
+  },
+  {
+    "name": "describe_topic",
+    "description": "Describe a specific Kafka topic. Returns partition details (leader, replicas, ISR, offline replicas) and non-default topic configurations.",
+    "prompt_context": "Use describe_topic when the user asks about a specific topic's details, partition layout, replica assignment, ISR status, or topic-level configuration overrides.",
+    "category": "cluster-ops",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "topic_name": {
+          "type": "string",
+          "description": "The topic name to describe"
+        }
+      },
+      "required": ["topic_name"]
     }
   }
 ]

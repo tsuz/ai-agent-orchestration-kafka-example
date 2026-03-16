@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { WsMessage, ChatMessage, Conversation, LogEntry, PipelineEvent } from "./types";
+import type { WsMessage, ChatMessage, ToolSource, Conversation, LogEntry, PipelineEvent } from "./types";
 
 const WS_URL = `ws://${window.location.host}/ws`;
 const RECONNECT_INTERVAL = 3000;
@@ -34,6 +34,7 @@ export function useWebSocket() {
   const [thinking, setThinking] = useState(false);
   const [sessionId, setSessionId] = useState<string>(generateSessionId);
   const sessionIdRef = useRef(sessionId);
+  const pendingToolSources = useRef<ToolSource[]>([]);
 
   // Keep ref in sync so the onopen callback always has the latest sessionId
   useEffect(() => {
@@ -61,10 +62,17 @@ export function useWebSocket() {
       try {
         const msg: WsMessage = JSON.parse(event.data);
         switch (msg.type) {
-          case "chat_response":
-            setMessages((prev) => [...prev, msg.data]);
+          case "chat_response": {
+            const chatMsg = { ...msg.data };
+            // Attach any buffered tool sources to this response
+            if (pendingToolSources.current.length > 0) {
+              chatMsg.sources = [...pendingToolSources.current];
+              pendingToolSources.current = [];
+            }
+            setMessages((prev) => [...prev, chatMsg]);
             setThinking(false);
             break;
+          }
           case "conversation_update":
             setConversations((prev) => {
               const idx = prev.findIndex((c) => c.id === msg.data.id);
@@ -78,6 +86,21 @@ export function useWebSocket() {
             break;
           case "pipeline_event":
             setPipelineEvents((prev) => [...prev, msg.data]);
+            // Buffer tool results to attach to the next assistant response
+            if (
+              msg.data.topic === "tool-use-result" &&
+              msg.data.sessionId === sessionIdRef.current &&
+              msg.data.value
+            ) {
+              const v = msg.data.value as Record<string, unknown>;
+              const resultData = v.result as Record<string, unknown> | undefined;
+              const consoleOutput = (resultData?.console_output as string)
+                ?? JSON.stringify(resultData ?? v, null, 2);
+              pendingToolSources.current.push({
+                toolName: (v.name as string) ?? "tool",
+                consoleOutput,
+              });
+            }
             break;
           case "log":
             setLogs((prev) => [...prev, msg.data]);

@@ -182,6 +182,7 @@ public class ToolExecutionConsumer implements AutoCloseable {
         shutdown();
         consumer.close();
         producer.close();
+        registry.close();
     }
 
     private static KafkaConsumer<String, String> createConsumer() {

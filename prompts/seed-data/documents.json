@@ -1,42 +1,67 @@
 [
   {
     "id": 1,
-    "text": "You are a helpful assistant that schedules meetings. When the user asks to set up a meeting, extract the participants, preferred time, and duration. Use the schedule_meeting tool to book it. Always confirm the details before scheduling.",
-    "metadata": { "category": "scheduling", "tool": "schedule_meeting" }
+    "text": "Runbook: Recovering from Under-Replicated Partitions\n\n1. Check which partitions are under-replicated:\n   kafka-topics.sh --bootstrap-server localhost:9092 --describe --under-replicated-partitions\n2. Identify the affected brokers from the output (look at ISR vs Replicas).\n3. Check broker logs for errors: grep -i 'error\\|warn' /var/log/kafka/server.log | tail -50\n4. Common causes: disk full, network partition, broker overloaded, log compaction stuck.\n5. If a broker is down, restart it: systemctl restart kafka\n6. If disk is full, either increase retention.ms or add disk capacity.\n7. Monitor recovery: watch the under-replicated partition count decrease.\n8. Verify ISR is back to normal: kafka-topics.sh --describe --topic <topic-name>",
+    "metadata": { "category": "runbook", "component": "broker", "severity": "high" }
   },
   {
     "id": 2,
-    "text": "You are an email drafting assistant. When the user asks to send an email, help them compose a clear and professional message. Extract the recipient, subject, and body. Use the send_email tool to deliver it. Ask for confirmation before sending.",
-    "metadata": { "category": "email", "tool": "send_email" }
+    "text": "Runbook: Consumer Lag Troubleshooting\n\n1. Check consumer group lag:\n   kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group <group-id>\n2. Look at LAG column for each partition. Lag > 10,000 requires investigation.\n3. Common causes:\n   - Slow processing: check consumer application logs for exceptions or slow downstream calls.\n   - Too few consumers: ensure consumer count <= partition count for the topic.\n   - max.poll.records too high: reduce if processing per-record is expensive.\n   - max.poll.interval.ms too low: increase if processing takes longer than the interval (causes rebalances).\n4. If consumer is stuck: check for rebalances in logs (look for 'JoinGroup' or 'SyncGroup').\n5. Quick fix: increase consumer instances (up to partition count) or reduce processing time.\n6. Monitor: set alerts on consumer lag metrics via JMX (kafka.consumer:type=consumer-fetch-manager-metrics).",
+    "metadata": { "category": "runbook", "component": "consumer", "severity": "medium" }
   },
   {
     "id": 3,
-    "text": "You are a task management assistant. When the user wants to create a task or to-do item, extract the title, description, due date, and priority. Use the create_task tool. Default priority is medium if not specified.",
-    "metadata": { "category": "tasks", "tool": "create_task" }
+    "text": "Runbook: Topic Partition Reassignment\n\nWARNING: Partition reassignment moves data between brokers and can impact cluster performance. Schedule during low-traffic periods.\n\n1. Generate reassignment plan:\n   kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --generate --topics-to-move-json-file topics.json --broker-list '0,1,2,3,4'\n2. Review the proposed plan carefully before executing.\n3. Execute the reassignment:\n   kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --execute --reassignment-json-file plan.json\n4. Throttle replication to avoid overwhelming the cluster:\n   kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --execute --reassignment-json-file plan.json --throttle 50000000\n5. Monitor progress:\n   kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --verify --reassignment-json-file plan.json\n6. Remove throttle after completion:\n   kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-default --alter --delete-config follower.replication.throttled.rate,leader.replication.throttled.rate",
+    "metadata": { "category": "runbook", "component": "broker", "severity": "high" }
   },
   {
     "id": 4,
-    "text": "You are a research assistant. When the user asks a question that requires up-to-date information, use the web_search tool to find relevant results. Summarize the findings concisely and cite your sources.",
-    "metadata": { "category": "research", "tool": "web_search" }
+    "text": "Runbook: Creating and Configuring Topics\n\n1. Create a topic:\n   kafka-topics.sh --bootstrap-server localhost:9092 --create --topic <name> --partitions 6 --replication-factor 3\n2. Our defaults: replication-factor=3, min.insync.replicas=2.\n3. Set retention:\n   kafka-configs.sh --bootstrap-server localhost:9092 --entity-type topics --entity-name <name> --alter --add-config retention.ms=604800000\n4. For compacted topics:\n   kafka-configs.sh --alter --add-config cleanup.policy=compact,min.cleanable.dirty.ratio=0.5,delete.retention.ms=86400000\n5. Partition count considerations:\n   - More partitions = more parallelism but more overhead.\n   - Rule of thumb: target throughput / per-partition throughput.\n   - Cannot reduce partition count after creation — plan carefully.\n6. List topics: kafka-topics.sh --bootstrap-server localhost:9092 --list\n7. Describe topic: kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic <name>",
+    "metadata": { "category": "runbook", "component": "topic", "severity": "low" }
   },
   {
     "id": 5,
-    "text": "You are a contacts lookup assistant. When the user asks about a person's contact information, use the lookup_contacts tool to find their details. Present the results clearly including name, email, and phone number if available.",
-    "metadata": { "category": "contacts", "tool": "lookup_contacts" }
+    "text": "Config Reference: Key Broker Configurations\n\n- num.partitions (default: 1): Default partition count for auto-created topics. Our setting: 6.\n- default.replication.factor (default: 1): Default replication for auto-created topics. Our setting: 3.\n- min.insync.replicas (default: 1): Minimum replicas that must ack a write when acks=all. Our setting: 2.\n- log.retention.hours (default: 168 = 7 days): How long to retain log segments. Our setting: 168 (7 days), 720 (30 days) for audit topics.\n- log.segment.bytes (default: 1073741824 = 1GB): Size of a single log segment file.\n- num.io.threads (default: 8): Threads for disk I/O. Increase for high-throughput clusters.\n- num.network.threads (default: 3): Threads for network requests. Increase for many clients.\n- unclean.leader.election.enable (default: false): Allow out-of-sync replica to become leader. Keep FALSE in production — data loss risk.\n- auto.create.topics.enable (default: true): Our setting: false. Always create topics explicitly.",
+    "metadata": { "category": "config", "component": "broker" }
   },
   {
     "id": 6,
-    "text": "When handling multi-step requests, break them down into individual actions. For example, if a user says 'find John's email and send him a meeting invite for tomorrow at 2pm', first use lookup_contacts to find John, then schedule_meeting with the retrieved email, and finally confirm the actions taken.",
-    "metadata": { "category": "multi-step", "tool": "multiple" }
+    "text": "Config Reference: Key Producer Configurations\n\n- acks (default: all): 'all' waits for all ISR replicas. Use 'all' for durability, '1' for lower latency.\n- retries (default: 2147483647): Number of retries on transient failures. Keep high with delivery.timeout.ms as the upper bound.\n- enable.idempotence (default: true): Prevents duplicate messages on retry. Always enable for exactly-once.\n- batch.size (default: 16384): Max bytes to batch before sending. Increase for throughput.\n- linger.ms (default: 0): How long to wait for more messages before sending a batch. Set 5-20ms for throughput.\n- compression.type (default: none): Options: gzip, snappy, lz4, zstd. Use lz4 or zstd for best ratio/speed.\n- max.in.flight.requests.per.connection (default: 5): Keep <= 5 with enable.idempotence=true to maintain ordering.",
+    "metadata": { "category": "config", "component": "producer" }
   },
   {
     "id": 7,
-    "text": "For weather-related queries, use the web_search tool to find current weather information. Include temperature, conditions, and any relevant forecasts. If the user asks about travel planning, combine weather data with scheduling tools.",
-    "metadata": { "category": "weather", "tool": "web_search" }
+    "text": "Config Reference: Key Consumer Configurations\n\n- max.poll.records (default: 500): Max records per poll(). Reduce if per-record processing is slow.\n- max.poll.interval.ms (default: 300000 = 5min): Max time between poll() calls before consumer is considered dead. Increase for heavy processing.\n- session.timeout.ms (default: 45000): Time before broker considers consumer dead if no heartbeat.\n- heartbeat.interval.ms (default: 3000): Frequency of heartbeats. Should be < session.timeout.ms / 3.\n- auto.offset.reset (default: latest): What to do when no committed offset. Use 'earliest' for new consumer groups that need full history.\n- enable.auto.commit (default: true): Our recommendation: false. Commit manually after processing for at-least-once.\n- fetch.min.bytes (default: 1): Min data per fetch response. Increase for throughput.\n- fetch.max.wait.ms (default: 500): Max time to wait for fetch.min.bytes.",
+    "metadata": { "category": "config", "component": "consumer" }
   },
   {
     "id": 8,
-    "text": "When the user's request is ambiguous or incomplete, ask clarifying questions before taking action. For example, if they say 'send an email to the team', ask which team members and what the email should contain. Never assume missing information.",
-    "metadata": { "category": "clarification", "tool": "none" }
+    "text": "Runbook: Broker Decommissioning\n\nWARNING: This is a destructive operation. Ensure the cluster has enough capacity to absorb the partitions.\n\nPrerequisites:\n- Verify cluster has N-1 brokers worth of capacity (disk, CPU, network).\n- Ensure no topics have replication-factor > (N-1) brokers remaining.\n- Schedule during maintenance window.\n\n1. Reassign all partitions off the broker:\n   Create a topics.json listing all topics, then generate and execute a reassignment plan excluding the target broker ID.\n2. Throttle replication to avoid overloading remaining brokers.\n3. Wait for reassignment to complete (verify with --verify flag).\n4. Confirm broker has no partitions: kafka-log-dirs.sh --bootstrap-server localhost:9092 --describe --broker-list <broker-id>\n5. Gracefully shut down the broker: systemctl stop kafka\n6. Remove broker from monitoring and alerting.\n7. Update cluster documentation with new broker list.",
+    "metadata": { "category": "runbook", "component": "broker", "severity": "high" }
+  },
+  {
+    "id": 9,
+    "text": "Runbook: Handling Consumer Group Rebalances\n\nSymptoms: consumers repeatedly joining/leaving group, high latency spikes, duplicate processing.\n\n1. Check rebalance frequency:\n   kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group <group-id> --state\n2. Common causes:\n   - Processing time exceeds max.poll.interval.ms → increase the interval or reduce max.poll.records.\n   - Frequent deployments → use static group membership (group.instance.id) to avoid rebalances on restart.\n   - Unstable network → increase session.timeout.ms.\n3. Enable cooperative rebalancing to reduce stop-the-world pauses:\n   partition.assignment.strategy=org.apache.kafka.clients.consumer.CooperativeStickyAssignor\n4. For Kafka Streams: use the same CooperativeStickyAssignor and ensure num.standby.replicas >= 1 for faster failover.\n5. Monitor: track rebalance rate via JMX metric kafka.consumer:type=consumer-coordinator-metrics,client-id=*,attr=rebalance-rate-per-hour.",
+    "metadata": { "category": "runbook", "component": "consumer", "severity": "medium" }
+  },
+  {
+    "id": 10,
+    "text": "Incident Playbook: Cluster Disk Full\n\nAlert: Kafka broker disk usage > 85%.\n\n1. Identify which topics consume the most disk:\n   kafka-log-dirs.sh --bootstrap-server localhost:9092 --describe --broker-list <broker-id> | sort by size\n2. Quick relief — reduce retention on large, non-critical topics:\n   kafka-configs.sh --bootstrap-server localhost:9092 --entity-type topics --entity-name <topic> --alter --add-config retention.ms=86400000\n3. Trigger log cleanup: kafka-configs.sh --alter --add-config log.cleaner.enable=true\n4. If compacted topics are growing: check min.cleanable.dirty.ratio and delete.retention.ms.\n5. Long-term fixes:\n   - Add more disk or brokers.\n   - Enable compression on high-volume topics.\n   - Review retention policies for all topics.\n   - Set up disk usage alerts at 70%, 80%, 90% thresholds.\n6. Never delete log segments manually — Kafka manages them via retention policies.",
+    "metadata": { "category": "incident", "component": "broker", "severity": "critical" }
+  },
+  {
+    "id": 11,
+    "text": "Architecture: Our Kafka Cluster Setup\n\nEnvironment:\n- 5 brokers running Kafka 4.1.1 in KRaft mode (no ZooKeeper)\n- Default replication factor: 3\n- min.insync.replicas: 2\n- Default retention: 7 days, 30 days for audit topics\n- Monitoring: Grafana + Prometheus via JMX exporter\n- Alerting: PagerDuty integration\n- Topics are created explicitly (auto.create.topics.enable=false)\n\nTopic naming convention: <domain>-<entity>-<version> (e.g. orders-created-v1)\n\nKey operational topics:\n- message-input, enriched-message-input, think-request-response, tool-use, tool-use-result, tool-use-all-complete, message-output, session-context, session-cost",
+    "metadata": { "category": "architecture", "component": "cluster" }
+  },
+  {
+    "id": 12,
+    "text": "Runbook: Kafka Streams Application Troubleshooting\n\n1. Check application state:\n   - Healthy: RUNNING\n   - Problem states: REBALANCING (normal during deploys), ERROR, NOT_RUNNING\n2. Common issues:\n   - Deserialization errors: check if topic schema changed. Use LogAndContinueExceptionHandler for non-critical topics.\n   - State store corruption: delete local state dir and let app rebuild from changelog topic.\n   - Rebalancing loop: ensure all instances use the same application.id and topology.\n3. Reset consumer offsets (for reprocessing):\n   kafka-streams-application-reset.sh --application-id <app-id> --input-topics <topics> --bootstrap-server localhost:9092\n   WARNING: This reprocesses all data from the input topics.\n4. Scale out: increase num.stream.threads or add more application instances (up to partition count).\n5. Monitor: track stream-thread metrics via JMX (kafka.streams:type=stream-thread-metrics).",
+    "metadata": { "category": "runbook", "component": "streams", "severity": "medium" }
+  },
+  {
+    "id": 13,
+    "text": "When troubleshooting Kafka issues, follow this general approach:\n1. Check the cluster health first — are all brokers up? Any under-replicated partitions?\n2. Narrow down the component: is the issue with a producer, consumer, broker, or Kafka Streams app?\n3. Check logs on the affected component.\n4. For producer issues: check acks config, retries, and batch settings.\n5. For consumer issues: check lag, rebalance frequency, and poll interval settings.\n6. For broker issues: check disk, memory, network, and file descriptor limits.\n7. Always check if a recent deployment or config change correlates with the issue.",
+    "metadata": { "category": "runbook", "component": "general" }
   }
 ]
